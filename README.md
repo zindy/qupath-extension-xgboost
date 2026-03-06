@@ -1,205 +1,170 @@
-# QuPath extension template
+# QuPath XGBoost Classifier Extension
 
-This repo contains a template and instructions to help create a new extension for [QuPath](https://qupath.github.io).
+A [QuPath](https://qupath.github.io) extension that brings [XGBoost](https://xgboost.readthedocs.io/) gradient-boosted tree classification to object classification workflows.
+Train a model from point or area annotations across multiple project images, then run inference across any selection of images — all from a GUI, no scripting required.
 
-It already contains two minimal extensions - one using Java, one using Groovy - so the first task is to make sure that they work.
-Then, it's a matter of customizing the code to make it more useful.
+---
 
-> **Update!** 
-> For QuPath v0.6.0 this repo switched to use Kotlin DSL for Gradle build files - 
-> and also to use the [QuPath Gradle Plugin](https://github.com/qupath/qupath-gradle-plugin).
-> 
-> The outcome is that the build files are _much_ simpler.
+## How it works
 
+### Training
 
-## Build the extension
+The extension looks for **annotated regions** (point or area ROIs) on top of existing detections to build training data.
 
-Building the extension with Gradle should be pretty easy - you don't even need to install Gradle separately, because the 
-[Gradle Wrapper](https://docs.gradle.org/current/userguide/gradle_wrapper.html) will take care of that.
+1. For each selected project entry it reads the object hierarchy.
+2. Every detection that falls inside an annotation whose class is one of the selected output classes becomes a training sample. If a detection is covered by annotations of more than one class, it is discarded to avoid label ambiguity.
+3. Measurement values for the selected features are extracted from each training detection into a feature matrix.
+4. An initial XGBoost model is trained on the full feature set to rank features by **gain importance**.
+5. A final model is retrained using only the top-N selected features (configurable; 0 = keep all).
+6. Feature names and class names are embedded directly in the saved model JSON so no external metadata file is needed at inference time.
 
-Open a command prompt, navigate to where the code lives, and use
+### Inference
+
+1. The saved model JSON is loaded; feature names and class names are read from its metadata.
+2. For each selected project entry, measurements are extracted from all detections using the embedded feature list.
+3. Each detection is assigned the class with the highest predicted probability.
+4. Image data is saved back to the project.
+
+---
+
+## Requirements
+
+- **QuPath** 0.7.0 or later
+- **Java** 25
+- Detections must already exist in the project images (e.g. from cell detection or tile classification)
+- Training images must have point or area annotations placed on top of detections, with a `PathClass` set to one of the desired output classes
+
+---
+
+## Build
+
+### Standalone shadow jar (recommended for distribution)
+
 ```bash
-gradlew build
+gradlew shadowJar
 ```
 
-The built extension should be found inside `build/libs`.
-You can drag this onto QuPath to install it.
-You'll be prompted to create a user directory if you don't already have one.
+The output is in `build/libs/` with `-all` in the filename.
+Drag this onto QuPath to install it — you will be prompted to create a user directory if you don't have one yet.
 
-The minimal extension here doesn't do much, but it should at least install a new command under the 'Extensions' menu in 
-QuPath.
+### During development (composite build)
 
-> In case your extension contains external dependencies beyond what QuPath already includes, you can create a 
-> [single jar file](https://imperceptiblethoughts.com/shadow/introduction/#benefits-of-shadow) that bundles these along 
-> with your extension by using
-> ```bash
-> gradlew shadowJar
-> ```
-> If you don't do that, you'll need to drag *all* the extra dependences onto QuPath to install them as well.
+Create a file called `include-extra` in the **root of the QuPath source directory** (not this repo):
 
-
-## Configure the extension
-
-Edit `settings.gradle.kts` to specify which version of QuPath your extension should be compatible with, e.g.
-
-```kotlin
-qupath {
-    version = "0.6.0"
-}
-```
-
-Edit `build.gradle.kts` to specify the details of your extension
-
-```kotlin
-qupathExtension {
-  name = "qupath-extension-template"
-  group = "io.github.qupath"
-  version = "0.1.0-SNAPSHOT"
-  description = "A simple QuPath extension"
-  automaticModule = "io.github.qupath.extension.template"
-}
-```
-
-
-## Run QuPath + the extension
-
-During development, your probably want to run QuPath easily with your extension installed for debugging.
-
-### 0. Make sure you have Java installed
-You'll need to install Java first.
-
-At the time of writing, we use a Java 21 JDK downloaded from https://adoptium.net/
-
-> Java 21 is a 'Long Term Support' release - which is why we use it instead of the very latest version.
-
-### 1. Get QuPath's source code
-You can find instructions at https://qupath.readthedocs.io/en/stable/docs/reference/building.html
-
-### 2. Create an `include-extra` file
-Create a file called `include-extra` in the root directory of the QuPath source code (*not* the extension code!).
-
-Set the contents of this file to:
 ```
 [includeBuild]
-/path/to/your/extension
+../qupath-extension-xgboost
 
 [dependencies]
-extension-group:extension-name
-```
-replacing the default lines where needed.
-
-For example, to build the extension with the names given above you'd use
-```
-[includeBuild]
-../qupath-extension-template
-
-[dependencies]
-io.github.qupath:qupath-extension-template
+io.github.qupath:qupath-extension-xgboost
 ```
 
-### 3. Run QuPath
-Run QuPath from the command line using
-```
+Then run QuPath from the QuPath source directory:
+
+```bash
 gradlew run
 ```
-If all goes well, QuPath should launch and you can check the *Extensions* mention to confirm the extension is installed.
 
+When using composite build, add `implementation` alongside `shadow` for XGBoost4J in `build.gradle.kts` so the dependency is available on the runtime classpath:
 
-## Set up in an IDE (optional)
+```kotlin
+implementation("ml.dmlc:xgboost4j_2.13:3.2.0")
+shadow("ml.dmlc:xgboost4j_2.13:3.2.0")
+```
 
-During development, things are likely to be much easier if you work within an IDE.
+---
 
-QuPath itself is developed using IntelliJ, and you can import the extension template there.
+## Usage
 
-The setup process is as above, and you'll need a a [Run configuration](https://www.jetbrains.com/help/idea/run-debug-configuration.html) 
-to call `gradlew run`.
+After installation the extension adds two commands under **Extensions → XGBoost Classifier**.
 
+---
 
-## Customize the extension
+### Train XGBoost Classifier
 
-Now you're ready for the creative part.
+Opens the training dialog.
 
-You can develop the extension using either Java or Groovy - the template includes examples of both.
+#### Project Entries
 
-### Create the extension Java or Groovy file(s)
+Select which project images to use for training. Only images with annotations on top of detections will contribute training data.
 
-For the extension to work, you need to create at least one file that extends `qupath.lib.gui.extensions.QuPathExtension`.
+- **Filter field** — type to search image names
+- **Available / Selected / Both** — toggle which side of the list the filter applies to
+- **With data file only** — hide images that have no saved data file
 
-There are two examples in the template, in two languages:
-* **Java:** `qupath.ext.template.DemoExtension.java`.
-* **Groovy:** `qupath.ext.template.DemoGroovyExtension.java`.
+#### Features
 
-You can pick the one that corresponds to the language you want to use, and delete the other.
+Select which object measurements to offer to the model. Use the **↺ Refresh** button to discover available measurements from the currently open image.
 
-Then take your chosen file and rename it, edit it, move it to another package... basically, make it your own.
+- **Filter field** — type to narrow the list; toggle **Available / Selected / Both** to target either side
+- All features moved to the right will be used as the initial feature set; the model then ranks and optionally reduces them further by gain importance
 
-> Please **don't neglect this step!** 
-> If you do, there's a chance of multiple extensions being created with the same class names... and causing confusion later.
+#### Output Classes
 
-### Update the `META-INF/services` file
+Select which annotation classes define the training labels. At least two classes are required.
 
-For QuPath to *find* the extension later, the full class name needs to be available in `resources/META-INFO/services/qupath.lib.gui.extensions.QuPathExtensions`.
+- **Filter field** — works the same as the features filter
 
-So remember to edit that file to include the class name that you actually used for your extension.
+#### Parameters
 
-### Specify your license
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| Model name | `my_xgboost` | Base filename; saved as `<name>.json` |
+| Output dir | Project `classifiers/object_classifiers/` | Directory for the saved model |
+| Rounds | 150 | Number of boosting rounds |
+| Max depth | 5 | Maximum depth of each tree |
+| Learning rate (η) | 0.2 | Step size shrinkage; lower = more conservative |
+| Subsample | 0.8 | Fraction of training rows sampled per round |
+| Top-N features | 10 | Keep only the N highest-gain features after the first pass; set to 0 to keep all |
 
-Add a license file to your GitHub repo so that others know what they can and can't do with your extension.
+The **Log** panel streams progress during training, including per-image object counts, the top-20 feature importances, and the final saved model path.
 
-This should be compatible with QuPath's license -- see https://github.com/qupath/qupath
+---
 
-## Repository configuration
+### Run XGBoost Classifier
 
-### Easy install
+Opens the inference dialog.
 
-If you follow some conventions in naming your extension and making releases, then other QuPath users will find it easy to automatically
-install and update your extension!
+#### Project Entries
 
-First, we suggest you name your extension `qupath-extension-[something]`, and keep it in its own repository (named the same as the extension),
-separate from other projects.
+Same filter controls as the training dialog. Select the images you want to classify.
 
-Next, when you want to publish a new version of your extension, use the `github_release.yml` workflow included in this repository.
+#### Model
 
-To do so, you'd need to navigate to `Actions -> Make draft release -> Run workflow -> Run workflow` as shown in the following screenshot:
+Pick the `.json` model file produced by the training step.
+The file chooser defaults to the project's `classifiers/object_classifiers/` folder.
 
-![Screenshot from 2024-03-14 18-44-42](https://github.com/alanocallaghan/qupath-extension-template/assets/10779688/4712a209-eda7-4f80-8bed-bbab20e4f50a)
+The **Log** panel reports the number of detections classified per image.
 
-This will automatically build the extension, and create a draft release containing the extension jar (and its associated sources and javadoc).
-You can then navigate to `Releases` and fill out information about the release --- the version, any significant changes, etc.
-Once published, users will be able to automatically install the extension as described here:
-https://qupath.readthedocs.io/en/0.5/docs/intro/extensions.html#installing-extensions
+---
 
-### Catalogs
+## Model file format
 
-QuPath's extension manager can easily install an extension if it is referenced in a **catalog**.
-A catalog is a JSON file hosted on a GitHub repository containing information about extensions, making it possible to easily manage them from QuPath.
+Models are saved as XGBoost native JSON. Feature names and class names are embedded as model attributes:
 
-To create a catalog, follow the [extension catalog model documentation](https://qupath.github.io/extension-catalog-model/).
-You will need to create a JSON file containing specific information about your extension and host it on a dedicated GitHub repository.
-Once the catalog is created, any user will be able to easily install your catalog by:
+- `feature_names` — the ordered list of measurement names the model expects
+- `class_names` — comma-separated list of output class names in label index order
 
-* Opening QuPath's extension manager by clicking on `Extensions` -> `Manage extensions` in QuPath.
-* Adding the URL to your catalog by clicking on `Manage extension catalogs` -> `Add` in the extension manager.
-* Clicking on the `+` symbol next to your extension in the extension manager.
+This makes a model file fully self-contained — it can be shared across projects or used in scripts as long as the same measurements exist in the target images.
 
-QuPath will then make it easy to manage your extension and automatically inform users when an update is available.
+---
 
-### Replace this readme
+## Tips
 
-Don't forget to replace the contents of this readme with your own!
+- **More training data is better.** Collect annotations across multiple images to cover the range of imaging conditions in your dataset.
+- **Start with Top-N = 0** to see the full importance ranking in the log, then re-train with a smaller Top-N to reduce overfitting on noisy measurements.
+- **Conflicting annotations** (a detection covered by two different classes) are silently discarded. If you see unexpectedly low training counts, check for overlapping annotations of different classes.
+- The final model is trained from scratch on the reduced feature set, so Rounds and Max depth apply to both the ranking pass and the final pass.
 
-
-## Getting help
-
-For questions about QuPath and/or creating new extensions, please use the forum at https://forum.image.sc/tag/qupath
-
-------
+---
 
 ## License
 
-This is just a template, you're free to use it however you like.
-You can treat the contents of *this repository only* as being under [the Unlicense](https://unlicense.org) (except for the Gradle wrapper, which has its own license included).
+GPL v3 — consistent with QuPath's own license.
 
-If you use it to create a new QuPath extension, I'd strongly encourage you to select a suitable open-source license for the extension.
+---
 
-Note that *QuPath itself* is available under the GPL, so you do have to abide by those terms: see https://github.com/qupath/qupath for more.
+## Acknowledgements
+
+- [QuPath](https://github.com/qupath/qupath) — Pete Bankhead and contributors
+- [XGBoost4J](https://xgboost.readthedocs.io/en/stable/jvm/index.html) — DMLC / XGBoost contributors
