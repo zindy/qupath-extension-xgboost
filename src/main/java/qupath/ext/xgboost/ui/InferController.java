@@ -16,6 +16,7 @@ import qupath.ext.xgboost.XGBoostInferencer;
 import qupath.lib.gui.QuPathGUI;
 import qupath.lib.gui.panes.ProjectEntryPredicate;
 import qupath.lib.projects.ProjectImageEntry;
+import qupath.fx.dialogs.Dialogs;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -274,9 +275,31 @@ public class InferController {
             @Override protected void succeeded() {
                 Platform.runLater(() -> {
                     runButton.setDisable(false);
-                    qupath.refreshProject();
+                    var project = qupath.getProject();
+                    if (project == null) return;
+                    Boolean reload = null;
+                    for (var viewer : qupath.getAllViewers()) {
+                        var imageData = viewer.getImageData();
+                        var entry = imageData == null ? null : project.getEntry(imageData);
+                        if (entry != null && entries.contains(entry)) {
+                            if (reload == null) {
+                                reload = Dialogs.showYesNoDialog("XGBoost Classifier",
+                                        "Refresh open images?\n"
+                                        + "This will show the new classifications -\n"
+                                        + "but unsaved changes in the current viewer will be lost.");
+                            }
+                            if (reload) {
+                                try {
+                                    viewer.setImageData(entry.readImageData());
+                                } catch (Exception e) {
+                                    Dialogs.showErrorNotification("XGBoost Classifier",
+                                            "Error reloading image: " + e.getLocalizedMessage());
+                                }
+                            }
+                        }
+                    }
                 });
-            }
+            }            
         };
         new Thread(task, "xgboost-infer") {{ setDaemon(true); }}.start();
     }

@@ -34,7 +34,7 @@ public class XGBoostExtension implements QuPathExtension {
 
     private static final String EXTENSION_NAME        = resources.getString("name");
     private static final String EXTENSION_DESCRIPTION = resources.getString("description");
-    private static final Version EXTENSION_QUPATH_VERSION = Version.parse("v0.6.0");
+    private static final Version EXTENSION_QUPATH_VERSION = Version.parse("v0.7.0");
 
     /** Persistent preference – lets users disable the extension from the Preferences pane. */
     private static final BooleanProperty enableExtensionProperty =
@@ -62,6 +62,10 @@ public class XGBoostExtension implements QuPathExtension {
     @Override public String getName()           { return EXTENSION_NAME; }
     @Override public String getDescription()    { return EXTENSION_DESCRIPTION; }
     @Override public Version getQuPathVersion() { return EXTENSION_QUPATH_VERSION; }
+    @Override public Version getVersion()       {
+        var v = getClass().getPackage().getImplementationVersion();
+        return (v == null) ? QuPathExtension.super.getVersion() : Version.parse(v);
+    }
 
     // ── Private helpers ────────────────────────────────────────────────────────
 

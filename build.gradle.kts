@@ -9,7 +9,7 @@ plugins {
 qupathExtension {
     name = "qupath-extension-xgboost"
     group = "io.github.qupath"
-    version = "0.1.0"
+    version = "0.1.1"
     description = "XGBoost object classifier extension for QuPath"
     automaticModule = "io.github.qupath.extension.xgboost"
 }
@@ -29,4 +29,12 @@ dependencies {
     testImplementation(libs.bundles.qupath)
     testImplementation(libs.junit)
 
+}
+
+tasks.jar {
+    manifest {
+        attributes(
+            "Implementation-Version" to project.version
+        )
+    }
 }
