@@ -8,3 +8,34 @@ jobs:
     permissions:
       contents: write
     uses: qupath/actions/.github/workflows/github-release.yml@main
+
+  shadow-jar:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 25
+
+      - name: Build shadowJar
+        run: ./gradlew shadowJar
+
+      - name: Get release tag
+        id: tag
+        run: echo "tag=$(git describe --tags --abbrev=0)" >> $GITHUB_OUTPUT
+
+      - name: Upload shadowJar to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload ${{ steps.tag.outputs.tag }} \
+            $(find build/libs -name "*-all.jar" | head -1) \
+            --clobber

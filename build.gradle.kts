@@ -9,7 +9,7 @@ plugins {
 qupathExtension {
     name = "qupath-extension-xgboost"
     group = "io.github.qupath"
-    version = "0.1.1"
+    version = "0.1.2"
     description = "XGBoost object classifier extension for QuPath"
     automaticModule = "io.github.qupath.extension.xgboost"
 }
