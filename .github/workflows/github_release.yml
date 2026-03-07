@@ -4,13 +4,13 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  shadow-jar:
     permissions:
       contents: write
     uses: qupath/actions/.github/workflows/github-release.yml@main
 
-  shadow-jar:
-    needs: build
+  attach-shadow-jar:
+    needs: shadow-jar
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -19,8 +19,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up JDK
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 25
@@ -32,7 +31,7 @@ jobs:
         id: tag
         run: echo "tag=$(git describe --tags --abbrev=0)" >> $GITHUB_OUTPUT
 
-      - name: Upload shadowJar to release
+      - name: Upload shadowJar to draft release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
