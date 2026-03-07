@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import qupath.lib.objects.PathObject;
 import qupath.lib.projects.ProjectImageEntry;
 import qupath.lib.objects.PathObjectTools;
+import java.util.Objects;
 
 
 import java.awt.image.BufferedImage;
@@ -105,7 +106,15 @@ public class XGBoostTrainer {
             List<PathObject> validDets = new ArrayList<>(detClass.keySet());
 
             if (validDets.isEmpty()) {
-                log.accept("  " + entry.getImageName() + ": 0 training objects found");
+                long annoCount = hierarchy.getAnnotationObjects().stream()
+                        .filter(a -> a.getPathClass() != null && classNames.contains(a.getPathClass().toString()))
+                        .count();
+                long detCount = hierarchy.getDetectionObjects().size();
+                long conflicts = detClass.values().stream().filter(Objects::isNull).count();
+                log.accept("  " + entry.getImageName() + ": 0 training objects found"
+                        + " (matching annotations: " + annoCount
+                        + ", detections: " + detCount
+                        + ", conflicts discarded: " + conflicts + ")");
                 continue;
             }
 
@@ -175,9 +184,10 @@ public class XGBoostTrainer {
                       String.format("  %-50s  %.0f", fs.name(), fs.score())));
 
         // ── 6. Select top-N features ────────────────────────────────────────────
-        List<FeatureScore> selected = (topNFeatures > 0 && topNFeatures < nFeatures)
+        List<FeatureScore> selected = (topNFeatures > 0 && topNFeatures < ranked.size())
                 ? ranked.subList(0, topNFeatures)
                 : ranked;
+
         int[] selIdx = selected.stream().mapToInt(FeatureScore::idx).toArray();
         log.accept("\nUsing " + selIdx.length + " features for final model.");
 

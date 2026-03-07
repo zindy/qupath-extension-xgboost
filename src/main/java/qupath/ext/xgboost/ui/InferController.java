@@ -272,7 +272,10 @@ public class InferController {
                 });
             }
             @Override protected void succeeded() {
-                Platform.runLater(() -> runButton.setDisable(false));
+                Platform.runLater(() -> {
+                    runButton.setDisable(false);
+                    qupath.refreshProject();
+                });
             }
         };
         new Thread(task, "xgboost-infer") {{ setDaemon(true); }}.start();

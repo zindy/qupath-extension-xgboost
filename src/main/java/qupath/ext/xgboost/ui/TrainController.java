@@ -20,6 +20,8 @@ import qupath.lib.objects.PathObjectFilter;
 import qupath.lib.objects.PathObjectTools;
 import qupath.lib.objects.classes.PathClass;
 import qupath.lib.projects.ProjectImageEntry;
+import qupath.lib.gui.dialogs.ProjectDialogs;
+import qupath.fx.dialogs.Dialogs;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -490,6 +492,25 @@ public class TrainController {
         float eta       = etaSpinner.getValue().floatValue();
         float subsample = subsampleSpinner.getValue().floatValue();
         int   topN      = topNSpinner.getValue();
+
+        // Warn if any selected entry is currently open (may have unsaved changes)
+        List<ProjectImageEntry<BufferedImage>> openAndSelected = selectedEntries.stream()
+                .filter(ProjectDialogs.getCurrentImages(qupath)::contains)
+                .collect(Collectors.toList());
+
+        if (!openAndSelected.isEmpty()) {
+            String names = openAndSelected.stream()
+                    .map(ProjectImageEntry::getImageName)
+                    .collect(Collectors.joining("\n  "));
+            var result = Dialogs.builder()
+                    .title("Unsaved changes?")
+                    .content(new Label("The following images are open in a viewer and may have unsaved changes:\n\n  "
+                            + names + "\n\nSave them first (Ctrl+S) to include the latest annotations.\nContinue anyway?"))
+                    .buttons(ButtonType.YES, ButtonType.NO)
+                    .showAndWait()
+                    .orElse(ButtonType.NO);
+            if (result != ButtonType.YES) return;
+        }
 
         logArea.clear();
         trainButton.setDisable(true);
