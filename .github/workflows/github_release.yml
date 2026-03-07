@@ -8,6 +8,8 @@ jobs:
     permissions:
       contents: write
     uses: qupath/actions/.github/workflows/github-release.yml@main
+    with:
+      java-version: "25"  # This overrides the default '21' in the QuPath workflow
 
   attach-shadow-jar:
     needs: shadow-jar
