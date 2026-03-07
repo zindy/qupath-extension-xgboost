@@ -29,14 +29,12 @@ jobs:
 
       - name: Get release tag
         id: tag
-        run: echo "tag=$(git describe --tags --abbrev=0)" >> $GITHUB_OUTPUT
-
-      - name: Debug releases
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          echo "Current tag: $(git describe --tags --abbrev=0)"
-          gh release list
+          TAG=$(gh release list --limit 1 --json tagName -q '.[0].tagName')
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Using tag: $TAG"
 
       - name: Upload shadowJar to draft release
         env:
