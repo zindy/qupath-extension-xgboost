@@ -37,6 +37,9 @@ import java.util.stream.Collectors;
  */
 public class TrainController {
 
+    private static final ResourceBundle RES =
+            ResourceBundle.getBundle("qupath.ext.xgboost.ui.strings");
+
     // ── Filter side ────────────────────────────────────────────────────────────
     private enum FilterSide { AVAILABLE, SELECTED, BOTH }
 
@@ -217,13 +220,13 @@ public class TrainController {
         paramGrid.setHgap(10); paramGrid.setVgap(6);
         paramGrid.setPadding(new Insets(6));
         int row = 0;
-        addParamRow(paramGrid, row++, "Model name:",     modelNameField,   "Base filename for the saved model JSON");
-        addParamRow(paramGrid, row++, "Output dir:",     dirRow,           "Directory where the model JSON will be saved");
-        addParamRow(paramGrid, row++, "Rounds:",         numRoundsSpinner, "Number of boosting rounds");
-        addParamRow(paramGrid, row++, "Max depth:",      maxDepthSpinner,  "Maximum tree depth");
-        addParamRow(paramGrid, row++, "Learning rate:",  etaSpinner,       "Step size shrinkage η (0–1)");
-        addParamRow(paramGrid, row++, "Subsample:",      subsampleSpinner, "Fraction of training samples per round (0–1)");
-        addParamRow(paramGrid, row++, "Top-N features:", topNSpinner,      "Keep only the N highest-gain features (0 = keep all)");
+        addParamRow(paramGrid, row++, RES.getString("param.model_name.label"), modelNameField,   RES.getString("param.model_name.help"));
+        addParamRow(paramGrid, row++, RES.getString("param.model_dir.label"),  dirRow,           RES.getString("param.model_dir.help"));
+        addParamRow(paramGrid, row++, RES.getString("param.num_rounds.label"), numRoundsSpinner, RES.getString("param.num_rounds.help"));
+        addParamRow(paramGrid, row++, RES.getString("param.max_depth.label"),  maxDepthSpinner,  RES.getString("param.max_depth.help"));
+        addParamRow(paramGrid, row++, RES.getString("param.eta.label"),        etaSpinner,       RES.getString("param.eta.help"));
+        addParamRow(paramGrid, row++, RES.getString("param.subsample.label"),  subsampleSpinner, RES.getString("param.subsample.help"));
+        addParamRow(paramGrid, row++, RES.getString("param.top_n.label"),      topNSpinner,      RES.getString("param.top_n.help"));
 
         TitledPane paramsPane = new TitledPane("Parameters", paramGrid);
         paramsPane.setCollapsible(true);
@@ -561,13 +564,46 @@ public class TrainController {
         }
     }
 
+    /**
+     * Adds a parameter row: [Label]  [control]  [?]
+     * The [?] button opens a popup with the full help text from strings.properties.
+     */
     private static void addParamRow(GridPane g, int row, String label,
-                                    Node ctrl, String tip) {
+                                    Node ctrl, String helpText) {
         Label l = new Label(label);
-        l.setTooltip(new Tooltip(tip));
+        String shortTip = helpText.split("\n")[0];
+        l.setTooltip(new Tooltip(shortTip));
+
+        Button helpBtn = new Button("?");
+        helpBtn.setPrefWidth(26);
+        helpBtn.setPrefHeight(24);
+        helpBtn.setStyle("-fx-font-size: 10; -fx-padding: 0;");
+        helpBtn.setTooltip(new Tooltip("Click for more information"));
+        helpBtn.setOnAction(e -> showHelp(label, helpText));
+
         GridPane.setHgrow(ctrl, Priority.ALWAYS);
-        g.add(l, 0, row);
-        g.add(ctrl, 1, row);
+        g.add(l,       0, row);
+        g.add(ctrl,    1, row);
+        g.add(helpBtn, 2, row);
+    }
+
+    /** Shows a non-modal popup with the full help text from strings.properties. */
+    private static void showHelp(String paramLabel, String helpText) {
+        String[] parts = helpText.split("\n", 2);
+        String title = parts[0].trim();
+        String body  = parts.length > 1 ? parts[1].trim() : "";
+
+        Label content = new Label(body);
+        content.setWrapText(true);
+        content.setMaxWidth(380);
+
+        var alert = new Alert(Alert.AlertType.NONE, "", ButtonType.OK);
+        alert.setTitle(title);
+        alert.setHeaderText(title);
+        alert.getDialogPane().setContent(content);
+        alert.getDialogPane().setPrefWidth(420);
+        alert.setResizable(true);
+        alert.show();
     }
 
     private static Spinner<Integer> intSpinner(int min, int max, int initial) {
